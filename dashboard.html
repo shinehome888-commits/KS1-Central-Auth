@@ -18,44 +18,48 @@
   </div>
 
   <script>
+    // Get token
     const token = localStorage.getItem('ks1_jwt_token');
+    
+    // If no token, go back to login
     if (!token) {
-      alert('No session found. Redirecting to login...');
+      console.warn('No token found. Redirecting to login.');
       window.location.href = 'index.html';
     }
 
-    async function loadProfile() {
-      try {
-        const res = await fetch('https://ks1-central-auth.onrender.com/auth/verify', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || 'Invalid session');
-        }
-
-        const user = await res.json();
-        document.getElementById('profile').innerHTML = `
-          <h2>Welcome!</h2>
-          <p><strong>KS1 Trade ID:</strong> ${user.trade_id}</p>
-          <p><strong>User ID:</strong> ${user.user_id}</p>
-          <p><strong>Role:</strong> ${user.role}</p>
-        `;
-      } catch (err) {
-        console.error('Dashboard error:', err);
-        alert('Session expired or invalid. Please log in again.');
-        localStorage.removeItem('ks1_jwt_token');
-        window.location.href = 'index.html';
+    // Verify token
+    fetch('https://ks1-central-auth.onrender.com/auth/verify', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
       }
-    }
+    })
+    .then(async (response) => {
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Unknown error');
+        throw new Error(`Auth failed: ${errorText}`);
+      }
+      return response.json();
+    })
+    .then((user) => {
+      document.getElementById('profile').innerHTML = `
+        <h2>Welcome!</h2>
+        <p><strong>KS1 Trade ID:</strong> ${user.trade_id}</p>
+        <p><strong>User ID:</strong> ${user.user_id}</p>
+        <p><strong>Role:</strong> ${user.role || 'user'}</p>
+      `;
+    })
+    .catch((err) => {
+      console.error('Dashboard load error:', err);
+      alert('Session invalid. Please log in again.');
+      localStorage.removeItem('ks1_jwt_token');
+      window.location.href = 'index.html';
+    });
 
     function logout() {
       localStorage.removeItem('ks1_jwt_token');
       window.location.href = 'index.html';
     }
-
-    loadProfile();
   </script>
 </body>
 </html>
