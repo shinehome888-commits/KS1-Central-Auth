@@ -8,21 +8,29 @@ const userSchema = new mongoose.Schema({
   phone: { type: String, unique: true, required: true },
   password: { type: String, required: true },
   kyc_status: { type: String, default: 'NOT_STARTED' },
-  trade_id: { type: String, unique: true }, // ✅ Will be KS1-XXXX
+  trade_id: { type: String, unique: true }, // ✅ Will be KS1-ABCD
   trust_score: { type: Number, default: 50 },
   role: { type: String, default: 'user', enum: ['user', 'admin'] }
 }, {
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
 });
 
-// Hash password before save
+// Hash password before saving
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
   this.password = await bcrypt.hash(this.password, 12);
   next();
 });
 
-// Generate trade_id in format KS1-ABCD (4 chars)
+// Generate user_id (internal)
+userSchema.pre('save', function(next) {
+  if (!this.user_id) {
+    this.user_id = 'usr_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+  }
+  next();
+});
+
+// Generate trade_id in format: KS1-ABCD (4 uppercase alphanumeric chars)
 userSchema.pre('save', function(next) {
   if (!this.trade_id) {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
