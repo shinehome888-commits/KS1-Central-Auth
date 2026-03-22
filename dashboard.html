@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>KS1 ALKEBULAN PAY – Dashboard</title>
+  <style>
+    body { background: #050A16; color: white; font-family: sans-serif; padding: 20px; }
+    .container { max-width: 600px; margin: 0 auto; }
+    .card { background: rgba(255,255,255,0.05); padding: 20px; border-radius: 10px; margin: 20px 0; }
+    .btn { background: #D4AF37; color: #000; border: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 20px; width: 100%; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>KS1 Identity Hub</h1>
+    <div id="profile" class="card">Loading...</div>
+    <button class="btn" onclick="logout()">Logout</button>
+  </div>
+
+  <script>
+    const token = localStorage.getItem('ks1_jwt_token');
+    if (!token) {
+      alert('No session found. Redirecting to login...');
+      window.location.href = 'index.html';
+    }
+
+    async function loadProfile() {
+      try {
+        const res = await fetch('https://ks1-central-auth.onrender.com/auth/verify', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Invalid session');
+        }
+
+        const user = await res.json();
+        document.getElementById('profile').innerHTML = `
+          <h2>Welcome!</h2>
+          <p><strong>KS1 Trade ID:</strong> ${user.trade_id}</p>
+          <p><strong>User ID:</strong> ${user.user_id}</p>
+          <p><strong>Role:</strong> ${user.role}</p>
+        `;
+      } catch (err) {
+        console.error('Dashboard error:', err);
+        alert('Session expired or invalid. Please log in again.');
+        localStorage.removeItem('ks1_jwt_token');
+        window.location.href = 'index.html';
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem('ks1_jwt_token');
+      window.location.href = 'index.html';
+    }
+
+    loadProfile();
+  </script>
+</body>
+</html>
