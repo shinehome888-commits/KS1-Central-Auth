@@ -1,60 +1,63 @@
-const express = require('express');
 const mongoose = require('mongoose');
-const dotenv = require('dotenv');
-const cors = require('cors');
-const helmet = require('helmet');
+const bcrypt = require('bcrypt');
 
-dotenv.config();
+const userSchema = new mongoose.Schema({
+  // System IDs
+  user_id: { type: String, unique: true, required: true },
+  trade_id: { type: String, unique: true, required: true },
 
-const app = express();
+  // Personal Info
+  full_name: { type: String, required: true },
+  phone: { type: String, unique: true, required: true }, // WhatsApp-enabled
+  password: { type: String, required: true },
+  user_birthday: { type: Date, required: true },
 
-// Security middleware
-app.use(helmet());
+  // Business Info
+  business_name: { type: String, required: true },
+  business_birthday: { type: Date, required: true },
+  business_type: { 
+    type: String, 
+    required: true,
+    enum: [
+      'Entrepreneur', 'Trader', 'SME', 'Vendor', 'Startup',
+      'Cooperative', 'NGO', 'Freelancer', 'Individual'
+    ]
+  },
+  industry: { type: String, required: true },
 
-// CORS: Allow only your Cloudflare Pages domains
-app.use(cors({
-  origin: [
-    'https://ks1-alkebulan-pay-identity-hub.pages.dev',
-    'https://ks1-alkebulan-pay-trade-coordination.pages.dev',
-    'https://ks1-alkebulan-pay-secure-transaction.pages.dev',
-    'https://ks1-alkebulan-pay-trade-support.pages.dev',
-    'https://ks1-alkebulan-pay-admin.pages.dev'
-  ],
-  credentials: true
-}));
+  // Location
+  country: { type: String, default: 'Ghana' },
+  city: { type: String, required: true },
+  town: { type: String, required: true },
+  address: { type: String, required: true },
 
-// Parse JSON bodies
-app.use(express.json());
+  // Optional
+  wallet: { type: String, sparse: true }, // Can be null
 
-// Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('✅ Connected to MongoDB'))
-  .catch(err => {
-    console.error('❌ MongoDB connection error:', err);
-    process.exit(1); // Fail fast on DB error
-  });
-
-// Auth routes
-const authRoutes = require('./routes/auth');
-app.use('/auth', authRoutes);
-
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'OK', service: 'KS1 Central Auth' });
+  // System Status
+  kyc_status: { type: String, default: 'NOT_STARTED' },
+  trust_score: { type: Number, default: 50 },
+  role: { type: String, default: 'user', enum: ['user', 'admin'] }
+}, {
+  timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
 });
 
-// Handle 404
-app.use('*', (req, res) => {
-  res.status(404).json({ error: 'Not Found' });
+// Hash password before saving
+userSchema.pre('save', async function(next) {
+  if (!this.isModified('password')) return next();
+  this.password = await bcrypt.hash(this.password, 12);
+  next();
 });
 
-// Global error handler
-app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
-  res.status(500).json({ error: 'Internal Server Error' });
+// Generate IDs on first save
+userSchema.pre('save', function(next) {
+  if (!this.user_id) {
+    this.user_id = 'usr_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+  }
+  if (!this.trade_id) {
+    this.trade_id = 'KS1-' + Math.random().toString(36).substr(2, 8).toUpperCase();
+  }
+  next();
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🚀 KS1 Central Auth running on port ${PORT}`);
-});
+module.exports = mongoose.model('User', userSchema);
