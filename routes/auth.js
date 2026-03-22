@@ -5,9 +5,8 @@ const User = require('../models/User');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_2026';
-const JWT_EXPIRES_IN = 86400; // 24 hours
+const JWT_EXPIRES_IN = 86400;
 
-// POST /auth/register
 router.post('/register', async (req, res) => {
   try {
     const { full_name, phone, email, password } = req.body;
@@ -27,7 +26,7 @@ router.post('/register', async (req, res) => {
     const token = jwt.sign(
       { 
         user_id: user.user_id,
-        trade_id: user.trade_id,  // ✅ Now KS1-XXXX
+        trade_id: user.trade_id,
         role: user.role
       },
       JWT_SECRET,
@@ -37,7 +36,7 @@ router.post('/register', async (req, res) => {
     res.status(201).json({
       success: true,
       user_id: user.user_id,
-      trade_id: user.trade_id,  // ✅ Returned to frontend
+      trade_id: user.trade_id,
       token
     });
   } catch (err) {
@@ -46,7 +45,6 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// POST /auth/login
 router.post('/login', async (req, res) => {
   try {
     const { phone, email, password } = req.body;
@@ -79,7 +77,7 @@ router.post('/login', async (req, res) => {
     res.json({
       success: true,
       user_id: user.user_id,
-      trade_id: user.trade_id,  // ✅ KS1-XXXX
+      trade_id: user.trade_id,
       token
     });
   } catch (err) {
@@ -88,7 +86,6 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// GET /auth/verify
 router.get('/verify', (req, res) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) {
@@ -99,7 +96,7 @@ router.get('/verify', (req, res) => {
     if (err) {
       return res.status(401).json({ error: 'Invalid or expired token' });
     }
-    res.json(decoded); // { user_id, trade_id, role, iat, exp }
+    res.json(decoded);
   });
 });
 
