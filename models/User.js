@@ -1,52 +1,36 @@
-// KS1-Central-Auth/models/User.js
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 
-// Helper to generate unique IDs
-const generateUserId = () => 'usr_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
-const generateTradeId = () => 'KS1-' + Math.random().toString(36).substr(2, 8).toUpperCase();
-
 const userSchema = new mongoose.Schema({
-  user_id: { 
-    type: String, 
-    unique: true, 
-    required: true,
-    default: generateUserId
-  },
-  trade_id: { 
-    type: String, 
-    unique: true, 
-    required: true,
-    default: generateTradeId
-  },
+  user_id: { type: String, unique: true, required: true },
   full_name: { type: String, required: true },
+  email: { type: String, unique: true, sparse: true },
   phone: { type: String, unique: true, required: true },
   password: { type: String, required: true },
-  user_birthday: { type: Date, required: true },
-  business_name: { type: String, required: true },
-  business_birthday: { type: Date, required: true },
-  business_type: { 
-    type: String, 
-    required: true,
-    enum: ['Entrepreneur','Trader','SME','Vendor','Startup','Cooperative','NGO','Freelancer','Individual']
-  },
-  industry: { type: String, required: true },
-  country: { type: String, default: 'Ghana' },
-  city: { type: String, required: true },
-  town: { type: String, required: true },
-  address: { type: String, required: true },
-  wallet: { type: String, sparse: true },
   kyc_status: { type: String, default: 'NOT_STARTED' },
+  trade_id: { type: String, unique: true }, // ✅ Will be KS1-XXXX
   trust_score: { type: Number, default: 50 },
   role: { type: String, default: 'user', enum: ['user', 'admin'] }
 }, {
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
 });
 
-// Hash password BEFORE save
+// Hash password before save
 userSchema.pre('save', async function(next) {
-  if (this.isModified('password')) {
-    this.password = await bcrypt.hash(this.password, 12);
+  if (!this.isModified('password')) return next();
+  this.password = await bcrypt.hash(this.password, 12);
+  next();
+});
+
+// Generate trade_id in format KS1-ABCD (4 chars)
+userSchema.pre('save', function(next) {
+  if (!this.trade_id) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let id = '';
+    for (let i = 0; i < 4; i++) {
+      id += chars[Math.floor(Math.random() * chars.length)];
+    }
+    this.trade_id = 'KS1-' + id;
   }
   next();
 });
