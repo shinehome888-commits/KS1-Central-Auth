@@ -1,35 +1,70 @@
-// routes/auth.js
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const User = require('../models/User');
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_EXPIRES_IN = parseInt(process.env.JWT_EXPIRES_IN) || 86400; // 24h
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_2026';
+const JWT_EXPIRES_IN = 86400; // 24 hours
 
 // POST /auth/register
 router.post('/register', async (req, res) => {
   try {
-    const { full_name, phone, email, password } = req.body;
+    const {
+      full_name,
+      phone,
+      password,
+      user_birthday,
+      business_name,
+      business_birthday,
+      business_type,
+      industry,
+      country = 'Ghana',
+      city,
+      town,
+      address,
+      wallet
+    } = req.body;
 
-    if (!full_name || !phone || !password) {
-      return res.status(400).json({ error: 'Full name, phone, and password are required' });
+    // Validate required fields
+    if (!full_name || !phone || !password || !user_birthday ||
+        !business_name || !business_birthday || !business_type ||
+        !industry || !city || !town || !address) {
+      return res.status(400).json({ error: 'All required fields must be filled' });
     }
 
     // Check if user exists
-    const existing = await User.findOne({ $or: [{ phone }, { email }] });
+    const existing = await User.findOne({ phone });
     if (existing) {
-      return res.status(409).json({ error: 'User already exists' });
+      return res.status(409).json({ error: 'User with this phone already exists' });
     }
 
     // Create user
-    const user = new User({ full_name, phone, email, password });
+    const user = new User({
+      full_name,
+      phone,
+      password,
+      user_birthday: new Date(user_birthday),
+      business_name,
+      business_birthday: new date(business_birthday),
+      business_type,
+      industry,
+      country,
+      city,
+      town,
+      address,
+      wallet: wallet || undefined // omit if empty
+    });
+
     await user.save();
 
     // Generate JWT
     const token = jwt.sign(
-      { user_id: user.user_id, trade_id: user.trade_id, role: user.role },
+      {
+        user_id: user.user_id,
+        trade_id: user.trade_id,
+        role: user.role
+      },
       JWT_SECRET,
       { expiresIn: JWT_EXPIRES_IN }
     );
@@ -37,10 +72,14 @@ router.post('/register', async (req, res) => {
     res.status(201).json({
       success: true,
       user_id: user.user_id,
+      trade_id: user.trade_id,
       token
     });
   } catch (err) {
     console.error('Registration error:', err);
+    if (err.code === 11000) {
+      return res.status(409).json({ error: 'Phone number already registered' });
+    }
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -48,14 +87,13 @@ router.post('/register', async (req, res) => {
 // POST /auth/login
 router.post('/login', async (req, res) => {
   try {
-    const { phone, email, password } = req.body;
-    const identifier = phone || email;
+    const { phone, password } = req.body;
 
-    if (!identifier || !password) {
-      return res.status(400).json({ error: 'Phone/email and password are required' });
+    if (!phone || !password) {
+      return res.status(400).json({ error: 'Phone and password are required' });
     }
 
-    const user = await User.findOne({ $or: [{ phone: identifier }, { email: identifier }] });
+    const user = await User.findOne({ phone });
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -66,7 +104,11 @@ router.post('/login', async (req, res) => {
     }
 
     const token = jwt.sign(
-      { user_id: user.user_id, trade_id: user.trade_id, role: user.role },
+      {
+        user_id: user.user_id,
+        trade_id: user.trade_id,
+        role: user.role
+      },
       JWT_SECRET,
       { expiresIn: JWT_EXPIRES_IN }
     );
@@ -96,29 +138,8 @@ router.get('/verify', (req, res) => {
     if (err) {
       return res.status(401).json({ error: 'Invalid or expired token' });
     }
-    res.json(decoded); // Returns { user_id, trade_id, role, iat, exp }
+    res.json(decoded);
   });
-});
-
-// GET /auth/profile
-router.get('/profile', async (req, res) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ error: 'No token provided' });
-  }
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await User.findOne({ user_id: decoded.user_id }).select('-password');
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    res.json(user);
-  } catch (err) {
-    res.status(401).json({ error: 'Invalid token' });
-  }
 });
 
 module.exports = router;
