@@ -5,22 +5,23 @@ const User = require('../models/User');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_2026';
-const JWT_EXPIRES_IN = 86400;
+const JWT_EXPIRES_IN = 86400; // 24 hours
 
+// POST /auth/register
 router.post('/register', async (req, res) => {
   try {
-    const { full_name, phone, email, password } = req.body;
+    const { full_name, phone, password } = req.body;
 
     if (!full_name || !phone || !password) {
       return res.status(400).json({ error: 'Full name, phone, and password are required' });
     }
 
-    const existing = await User.findOne({ $or: [{ phone }, { email }] });
+    const existing = await User.findOne({ $or: [{ phone }, { email: req.body.email }] });
     if (existing) {
       return res.status(409).json({ error: 'User already exists' });
     }
 
-    const user = new User({ full_name, phone, email, password });
+    const user = new User({ full_name, phone, password });
     await user.save();
 
     const token = jwt.sign(
@@ -45,16 +46,23 @@ router.post('/register', async (req, res) => {
   }
 });
 
+// POST /auth/login
 router.post('/login', async (req, res) => {
   try {
-    const { phone, email, password } = req.body;
-    const identifier = phone || email;
+    const { identifier, password } = req.body;
 
     if (!identifier || !password) {
-      return res.status(400).json({ error: 'Phone/email and password are required' });
+      return res.status(400).json({ error: 'Trade ID, phone, or email and password are required' });
     }
 
-    const user = await User.findOne({ $or: [{ phone: identifier }, { email: identifier }] });
+    const user = await User.findOne({
+      $or: [
+        { trade_id: identifier },
+        { phone: identifier },
+        { email: identifier }
+      ]
+    });
+
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -86,6 +94,7 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// GET /auth/verify
 router.get('/verify', (req, res) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) {
