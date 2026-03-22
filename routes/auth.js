@@ -10,58 +10,24 @@ const JWT_EXPIRES_IN = 86400; // 24 hours
 // POST /auth/register
 router.post('/register', async (req, res) => {
   try {
-    const {
-      full_name,
-      phone,
-      password,
-      user_birthday,
-      business_name,
-      business_birthday,
-      business_type,
-      industry,
-      country = 'Ghana',
-      city,
-      town,
-      address,
-      wallet
-    } = req.body;
+    const { full_name, phone, email, password } = req.body;
 
-    // Validate required fields
-    if (!full_name || !phone || !password || !user_birthday ||
-        !business_name || !business_birthday || !business_type ||
-        !industry || !city || !town || !address) {
-      return res.status(400).json({ error: 'All required fields must be filled' });
+    if (!full_name || !phone || !password) {
+      return res.status(400).json({ error: 'Full name, phone, and password are required' });
     }
 
-    // Check if user exists
-    const existing = await User.findOne({ phone });
+    const existing = await User.findOne({ $or: [{ phone }, { email }] });
     if (existing) {
-      return res.status(409).json({ error: 'User with this phone already exists' });
+      return res.status(409).json({ error: 'User already exists' });
     }
 
-    // Create user
-   const user = new User({
-  full_name,
-  phone,
-  password,
-  user_birthday: new Date(user_birthday),
-  business_name,
-  business_birthday: new Date(business_birthday), // ✅ FIXED
-  business_type,
-  industry,
-  country,
-  city,
-  town,
-  address,
-  wallet: wallet || undefined
-});
+    const user = new User({ full_name, phone, email, password });
     await user.save();
 
-    // Generate JWT
     const token = jwt.sign(
-      {
+      { 
         user_id: user.user_id,
-        trade_id: user.trade_id,
+        trade_id: user.trade_id,  // ✅ Now KS1-XXXX
         role: user.role
       },
       JWT_SECRET,
@@ -71,14 +37,11 @@ router.post('/register', async (req, res) => {
     res.status(201).json({
       success: true,
       user_id: user.user_id,
-      trade_id: user.trade_id,
+      trade_id: user.trade_id,  // ✅ Returned to frontend
       token
     });
   } catch (err) {
     console.error('Registration error:', err);
-    if (err.code === 11000) {
-      return res.status(409).json({ error: 'Phone number already registered' });
-    }
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -86,13 +49,14 @@ router.post('/register', async (req, res) => {
 // POST /auth/login
 router.post('/login', async (req, res) => {
   try {
-    const { phone, password } = req.body;
+    const { phone, email, password } = req.body;
+    const identifier = phone || email;
 
-    if (!phone || !password) {
-      return res.status(400).json({ error: 'Phone and password are required' });
+    if (!identifier || !password) {
+      return res.status(400).json({ error: 'Phone/email and password are required' });
     }
 
-    const user = await User.findOne({ phone });
+    const user = await User.findOne({ $or: [{ phone: identifier }, { email: identifier }] });
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -103,7 +67,7 @@ router.post('/login', async (req, res) => {
     }
 
     const token = jwt.sign(
-      {
+      { 
         user_id: user.user_id,
         trade_id: user.trade_id,
         role: user.role
@@ -115,7 +79,7 @@ router.post('/login', async (req, res) => {
     res.json({
       success: true,
       user_id: user.user_id,
-      trade_id: user.trade_id,
+      trade_id: user.trade_id,  // ✅ KS1-XXXX
       token
     });
   } catch (err) {
@@ -126,9 +90,7 @@ router.post('/login', async (req, res) => {
 
 // GET /auth/verify
 router.get('/verify', (req, res) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
+  const token = req.headers.authorization?.split(' ')[1];
   if (!token) {
     return res.status(401).json({ error: 'No token provided' });
   }
@@ -137,7 +99,7 @@ router.get('/verify', (req, res) => {
     if (err) {
       return res.status(401).json({ error: 'Invalid or expired token' });
     }
-    res.json(decoded);
+    res.json(decoded); // { user_id, trade_id, role, iat, exp }
   });
 });
 
