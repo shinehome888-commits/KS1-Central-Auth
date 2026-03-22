@@ -40,22 +40,21 @@ router.post('/register', async (req, res) => {
     }
 
     // Create user
-    const user = new User({
-      full_name,
-      phone,
-      password,
-      user_birthday: new Date(user_birthday),
-      business_name,
-      business_birthday: new date(business_birthday),
-      business_type,
-      industry,
-      country,
-      city,
-      town,
-      address,
-      wallet: wallet || undefined // omit if empty
-    });
-
+   const user = new User({
+  full_name,
+  phone,
+  password,
+  user_birthday: new Date(user_birthday),
+  business_name,
+  business_birthday: new Date(business_birthday), // ✅ FIXED
+  business_type,
+  industry,
+  country,
+  city,
+  town,
+  address,
+  wallet: wallet || undefined
+});
     await user.save();
 
     // Generate JWT
