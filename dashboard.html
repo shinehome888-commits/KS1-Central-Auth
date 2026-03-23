@@ -8,23 +8,32 @@
     .container { max-width: 600px; margin: 0 auto; }
     .card { background: rgba(255,255,255,0.05); padding: 20px; border-radius: 10px; margin: 20px 0; }
     .btn { background: #D4AF37; color: #000; border: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 20px; width: 100%; }
+    .error { color: #ff6b6b; margin: 10px 0; }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>KS1 Identity Hub</h1>
-    <div id="profile" class="card">Loading...</div>
+    <div id="profile" class="card">Loading your profile...</div>
+    <div id="debug" class="error" style="display:none;"></div>
     <button class="btn" onclick="logout()">Logout</button>
   </div>
 
   <script>
-    // Get token
+    // Immediately log what we have
     const token = localStorage.getItem('ks1_jwt_token');
-    
-    // If no token, go back to login
+    const debugEl = document.getElementById('debug');
+
+    function logDebug(msg) {
+      console.log('[Dashboard Debug]:', msg);
+      debugEl.style.display = 'block';
+      debugEl.textContent = msg;
+    }
+
     if (!token) {
-      console.warn('No token found. Redirecting to login.');
-      window.location.href = 'index.html';
+      logDebug('No token found in localStorage. Redirecting to login.');
+      setTimeout(() => window.location.href = 'index.html', 2000);
+      return;
     }
 
     // Verify token
@@ -35,25 +44,29 @@
       }
     })
     .then(async (response) => {
+      const text = await response.text();
+      console.log('Auth verify response:', response.status, text);
+
       if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown error');
-        throw new Error(`Auth failed: ${errorText}`);
+        throw new Error(`HTTP ${response.status}: ${text}`);
       }
-      return response.json();
-    })
-    .then((user) => {
-      document.getElementById('profile').innerHTML = `
-        <h2>Welcome!</h2>
-        <p><strong>KS1 Trade ID:</strong> ${user.trade_id}</p>
-        <p><strong>User ID:</strong> ${user.user_id}</p>
-        <p><strong>Role:</strong> ${user.role || 'user'}</p>
-      `;
+
+      try {
+        const user = JSON.parse(text);
+        document.getElementById('profile').innerHTML = `
+          <h2>Welcome!</h2>
+          <p><strong>KS1 Trade ID:</strong> ${user.trade_id}</p>
+          <p><strong>User ID:</strong> ${user.user_id}</p>
+          <p><strong>Role:</strong> ${user.role || 'user'}</p>
+        `;
+      } catch (e) {
+        throw new Error('Invalid JSON from auth service: ' + text);
+      }
     })
     .catch((err) => {
-      console.error('Dashboard load error:', err);
-      alert('Session invalid. Please log in again.');
+      logDebug('Verification failed: ' + err.message);
       localStorage.removeItem('ks1_jwt_token');
-      window.location.href = 'index.html';
+      setTimeout(() => window.location.href = 'index.html', 3000);
     });
 
     function logout() {
